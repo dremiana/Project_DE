@@ -41,12 +41,13 @@ begin
     left join DS.MD_EXCHANGE_RATE_D er on a.currency_rk = er.currency_rk and i_OnDate between er.data_actual_date and er.data_actual_end_date 
     where i_OnDate between a.data_actual_date and a.data_actual_end_date;
    
-   -- Логирование
+    -- Логирование
 	end_time := current_timestamp;
 	insert into logs.log_table (log_data, log_time)
 	values ('Окончание заполнения DM_ACCOUNT_BALANCE_F за ' || i_OnDate, end_time);
 	
 	exception when others then
+	end_time := current_timestamp;
 	insert into logs.log_table (log_data, log_time)
 	values ('Ошибка: ' || SQLERRM, end_time);
     

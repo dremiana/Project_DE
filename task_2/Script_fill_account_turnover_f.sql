@@ -62,6 +62,7 @@ begin
 	values ('Окончание заполнения DM_ACCOUNT_TURNOVER_F за ' || i_OnDate, end_time);
 	
 	exception when others then
+	end_time := current_timestamp;
 	insert into logs.log_table (log_data, log_time)
 	values ('Ошибка: ' || SQLERRM, end_time);
 
