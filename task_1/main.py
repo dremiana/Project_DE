@@ -5,9 +5,10 @@ import connection_to_postgres as ctp
 from contextlib import contextmanager
 import logging
 
+# Логирование в консоль, для отслеживания ошибок
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-
+# Для получения соединения с базой данных
 @contextmanager
 def get_connection():
     conn = psycopg2.connect(host=ctp.host, database=ctp.dbname, user=ctp.user, password=ctp.password)
@@ -16,7 +17,7 @@ def get_connection():
     finally:
         conn.close()
 
-
+# Для получения курсора
 @contextmanager
 def get_cursor(conn):
     cur = conn.cursor()
@@ -25,7 +26,7 @@ def get_cursor(conn):
     finally:
         cur.close()
 
-
+# Функция для выполнения запроса
 def sql_query(conn, query, parameters=None):
     with get_cursor(conn) as cur:
         if parameters is None:
@@ -34,12 +35,13 @@ def sql_query(conn, query, parameters=None):
             cur.execute(query, parameters)
         conn.commit()
 
-
+# Функция для записи логов в таблицу log_table
 def log_event(conn, event):
     sql_query(conn, "INSERT INTO LOGS.log_table (log_data, log_time) VALUES (%s, LOCALTIMESTAMP(0));", (event,))
 
-
+# Функция для загрузки данных в таблицы
 def data_loading(conn):
+    # Функция для вставки данных в таблицу
     def insert_data(table_name, rows, query):
         log_event(conn, f"Начало загрузки данных в таблицу {table_name}")
         for row in rows.itertuples(index=False, name=None):
@@ -49,7 +51,7 @@ def data_loading(conn):
                 logging.error(f"Ошибка при загрузке данных в таблицу {table_name}: {row}")
                 logging.error(e)
                 raise e
-        time.sleep(5)  # Simulate time-consuming task
+        time.sleep(5)
         log_event(conn, f"Данные в таблицу {table_name} добавлены")
         logging.info(f"Данные в таблицу {table_name} добавлены")
 
@@ -64,7 +66,6 @@ def data_loading(conn):
     insert_data('MD_CURRENCY_D', tables.currency,
                 "INSERT INTO DS.MD_CURRENCY_D (currency_rk, data_actual_date, data_actual_end_date, currency_code, code_iso_char) VALUES (%s, %s, %s, %s, %s) ON CONFLICT (currency_rk, data_actual_date) DO UPDATE SET data_actual_end_date = EXCLUDED.data_actual_end_date, currency_code = EXCLUDED.currency_code, code_iso_char = EXCLUDED.code_iso_char;")
 
-    # Handle FT_POSTING_F with temporary table
     sql_query(conn, "DROP TABLE IF EXISTS templ1 CASCADE;")
     sql_query(conn, '''CREATE TABLE templ1 (
                         oper_date DATE NOT NULL,
@@ -84,7 +85,6 @@ def data_loading(conn):
                        ON CONFLICT DO NOTHING;''')
     logging.info("Данные в таблицу FT_POSTING_F добавлены")
 
-    # Handle MD_EXCHANGE_RATE_D with temporary table
     sql_query(conn, "DROP TABLE IF EXISTS templ2 CASCADE;")
     sql_query(conn, '''CREATE TABLE templ2 (
                         data_actual_date DATE NOT NULL,
@@ -107,7 +107,7 @@ def data_loading(conn):
     insert_data('MD_LEDGER_ACCOUNT_S', tables.ledger_account,
                 "INSERT INTO DS.MD_LEDGER_ACCOUNT_S (chapter, chapter_name, section_number, section_name, subsection_name, ledger1_account, ledger1_account_name, ledger_account, ledger_account_name, characteristic, is_resident, is_reserve, is_reserved, is_loan, is_reserved_assets, is_overdue, is_interest, pair_account, start_date, end_date, is_rub_only, min_term, min_term_measure, max_term, max_term_measure, ledger_acc_full_name_translit, is_revaluation, is_correct) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) ON CONFLICT (ledger_account, start_date) DO UPDATE SET chapter = EXCLUDED.chapter, chapter_name = EXCLUDED.chapter_name, section_number = EXCLUDED.section_number, section_name = EXCLUDED.section_name, subsection_name = EXCLUDED.subsection_name, ledger1_account = EXCLUDED.ledger1_account, ledger1_account_name = EXCLUDED.ledger1_account_name, ledger_account_name = EXCLUDED.ledger_account_name, characteristic = EXCLUDED.characteristic, is_resident = EXCLUDED.is_resident, is_reserve = EXCLUDED.is_reserve, is_reserved = EXCLUDED.is_reserved, is_loan = EXCLUDED.is_loan, is_reserved_assets = EXCLUDED.is_reserved_assets, is_overdue = EXCLUDED.is_overdue, is_interest = EXCLUDED.is_interest, pair_account = EXCLUDED.pair_account, end_date = EXCLUDED.end_date, is_rub_only = EXCLUDED.is_rub_only, min_term = EXCLUDED.min_term, min_term_measure = EXCLUDED.min_term_measure, max_term = EXCLUDED.max_term, max_term_measure = EXCLUDED.max_term_measure, ledger_acc_full_name_translit = EXCLUDED.ledger_acc_full_name_translit, is_revaluation = EXCLUDED.is_revaluation, is_correct = EXCLUDED.is_correct;")
 
-
+# Функция для запуска ETL процесса
 def etl_process_start():
     logging.info("Начинается загрузка данных")
     with get_connection() as conn:
